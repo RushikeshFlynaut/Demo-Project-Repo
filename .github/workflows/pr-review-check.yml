@@ -1,0 +1,27 @@
+name: PR Review Check
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize]
+
+jobs:
+  review-check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check if PR has an approved review
+        run: |
+          PR_ID=$(jq --raw-output .pull_request.number $GITHUB_EVENT_PATH)
+          REVIEWS=$(curl -s \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${{ github.repository }}/pulls/$PR_ID/reviews")
+          
+          # Check if there is at least one approved review
+          APPROVED_COUNT=$(echo "$REVIEWS" | jq '[.[] | select(.state == "APPROVED")] | length')
+          
+          if [[ "$APPROVED_COUNT" -eq 0 ]]; then
+            echo "No approved review found. Please get a review before merging."
+            exit 1  # Fail the workflow, blocking the merge
+          else
+            echo "Approved review found. Proceeding with merge."
+          fi
